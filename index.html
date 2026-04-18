@@ -3188,12 +3188,16 @@ const RDA={
 };
 
 const QUICK_MEALS=[
-  {label:'🍳 South Indian breakfast',items:['Idli (2 pieces)','Sambar (1 cup)','Curd / Dahi (1 cup)']},
-  {label:'🍛 Dal chawal',items:['Dal (lentil soup, 1 cup)','White rice (1 cup cooked)','Onion (1 medium)']},
-  {label:'🥚 Egg breakfast',items:['Scrambled eggs (2 eggs)','Whole wheat bread (1 slice)','Orange juice (1 glass)']},
-  {label:'🍗 Chicken rice bowl',items:['Chicken breast (100g)','Brown rice (1 cup cooked)','Broccoli (1 cup)']},
-  {label:'🥣 Oat bowl',items:['Oatmeal (1 cup cooked)','Banana (1 medium)','Almonds (25g handful)']},
-  {label:'🥗 Protein salad',items:['Caesar salad (1 bowl)','Chicken breast (100g)','Avocado (half)']},
+  {label:'🍳 South Indian breakfast',items:['Idli (2 pieces/70g)','Sambar (1 cup/240g)','Curd / Dahi full fat (1 cup/240g)']},
+  {label:'🍛 Dal chawal',items:['Dal (lentil soup, 1 cup)','White rice cooked (1 cup/186g)','Onion medium (1 piece/110g)']},
+  {label:'🥚 Egg breakfast',items:['Eggs scrambled (2 large)','Whole wheat bread (1 slice/28g)','Orange juice glass (1 glass/300ml)']},
+  {label:'🍗 Chicken rice bowl',items:['Chicken breast grilled (100g)','Brown rice cooked (1 cup/195g)','Broccoli cooked (1 cup/156g)']},
+  {label:'🥣 Oat bowl',items:['Oatmeal cooked (1 cup/234g)','Banana medium (1 piece/118g)','Almonds (25g)']},
+  {label:'🥗 Protein salad',items:['Caesar salad with dressing (1 bowl/200g)','Chicken breast grilled (100g)','Avocado half (1 piece/100g)']},
+  {label:'🐟 Fish & rice',items:['Salmon fillet cooked (100g)','Brown rice cooked (1 cup/195g)','Steamed broccoli with butter (1 cup/156g)']},
+  {label:'🫘 Rajma chawal',items:['Rajma cooked (1 cup/171g)','White rice cooked (1 cup/186g)','Curd / Dahi full fat (1 cup/240g)']},
+  {label:'🥞 Protein breakfast',items:['Eggs boiled (2 large)','Whole wheat bread (1 slice/28g)','Banana medium (1 piece/118g)']},
+  {label:'🍲 Kerala thali',items:['Brown rice cooked (1 cup/195g)','Sambar Kerala style (1 cup/240g)','Paavakka mezhukkupuratti / Bitter gourd fry (1 cup/150g)']},
 ];
 
 // ═══════════════════════════════════
@@ -4214,12 +4218,51 @@ function renderPresets(){
 //  QUICK ADD
 // ═══════════════════════════════════
 function buildQuickList(){
-  document.getElementById('quick-list').innerHTML=QUICK_MEALS.map(qm=>`<div onclick="quickAdd(${JSON.stringify(qm.items).replace(/"/g,"'")})" style="padding:9px 12px;background:var(--bg);border:0.5px solid var(--bd);border-radius:var(--rs);cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:8px" onmouseover="this.style.borderColor='var(--gm)'" onmouseout="this.style.borderColor='var(--bd)'"><span style="font-weight:600">${qm.label}</span><span style="font-size:11px;color:var(--tx3)">${qm.items.slice(0,2).join(' · ')}…</span></div>`).join('');
+  const el=document.getElementById('quick-list');
+  if(!el)return;
+  el.innerHTML=QUICK_MEALS.map(qm=>{
+    // Calculate total calories for the meal
+    let totalCal=0;
+    qm.items.forEach(name=>{
+      let f=FOODS.find(x=>x&&x.n===name);
+      if(!f){const res=fuzzySearchFoods(name);if(res&&res[0])f=res[0];}
+      if(f)totalCal+=f.c;
+    });
+    const calStr=totalCal>0?Math.round(totalCal)+' kcal':'';
+    const itemCount=qm.items.length;
+    // Safe JSON for onclick — use data attribute to avoid quote escaping issues
+    const idx=QUICK_MEALS.indexOf(qm);
+    return `<div onclick="quickAddByIndex(${idx})" style="padding:10px 14px;background:var(--bg);border:0.5px solid var(--bd);border-radius:var(--rs);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;transition:all .15s" onmouseover="this.style.borderColor='var(--gm)';this.style.background='var(--gl)'" onmouseout="this.style.borderColor='var(--bd)';this.style.background='var(--bg)'">
+      <div>
+        <div style="font-size:13px;font-weight:700">${qm.label}</div>
+        <div style="font-size:11px;color:var(--tx3);margin-top:2px">${qm.items.slice(0,2).map(n=>n.split('(')[0].trim()).join(' · ')}${qm.items.length>2?'…':''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        ${calStr?`<div style="font-size:12px;font-weight:800;color:var(--g)">${calStr}</div>`:''}
+        <div style="font-size:10px;color:var(--tx3)">${itemCount} item${itemCount!==1?'s':''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function quickAddByIndex(idx){
+  const qm=QUICK_MEALS[idx];
+  if(qm)quickAdd(qm.items);
 }
 function quickAdd(items){
   addedItems=[];
-  items.forEach(name=>{const f=FOODS.find(x=>x&&x.n===name);if(f)addedItems.push(f);});
-  renderAddedItems();go('log');toast('Items added — click Log Meal!');
+  items.forEach(name=>{
+    // Try exact match first
+    let f=FOODS.find(x=>x&&x.n===name);
+    // Fuzzy fallback if exact fails
+    if(!f){const res=fuzzySearchFoods(name);if(res&&res[0])f=res[0];}
+    if(f)addedItems.push(f);
+  });
+  if(!addedItems.length){toast('Could not find those foods — try searching manually');return;}
+  renderAddedItems();
+  go('log');
+  // Scroll to added items so user sees them
+  setTimeout(()=>{const el=document.getElementById('added-items-wrap');if(el)el.scrollIntoView({behavior:'smooth',block:'start'});},200);
+  toast(addedItems.length+' item'+(addedItems.length>1?'s':'')+' added — tap Log Meal to save!');
 }
 function setMT(t){MT=t;document.querySelectorAll('.mt').forEach(m=>m.classList.remove('on'));document.getElementById('mt-'+t).classList.add('on');}
 
